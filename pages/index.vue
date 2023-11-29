@@ -1,22 +1,25 @@
 <template>
     <div>
-      <h1>Nuxt 3 Metamask Example</h1>
-      <button @click="connectWallet">Connect Wallet</button>
+      <h1>Nuxt 3 Token Balances Example</h1>
+      <button @click="handleOnConnectWallet">Connect Wallet</button>
       <div v-if="connected">
-        <p>Address: {{ wallet.address }}</p>
-        <div>
+        <p>EOA Wallet: {{ wallet.address }}</p>
+        <div v-if="balances.length > 0">
           <h2>Balances:</h2>
-          <ul>
-            <li v-for="balance in balances" :key="balance.token">
-              {{ balance.token }}: {{ balance.balance }}
-            </li>
-          </ul>
+          <div v-for="networkBalances in balances" :key="networkBalances.network">
+            <h3>{{ networkBalances.network }}</h3>
+            <ul>
+              <li v-for="balance in networkBalances.balances" :key="balance.token">
+                {{ balance.token }}: {{ balance.balance }}
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
   </template>
   
-  <script setup>
+  <script setup lang="ts">
   import { ref } from 'vue';
   import { connectWallet, getTokenBalances } from '@/services/metamask';
   
@@ -24,15 +27,26 @@
   const wallet = ref({});
   const balances = ref([]);
   
-  const connectWallet = async () => {
+  const handleOnConnectWallet = async () => {
     const signer = await connectWallet();
     if (signer) {
-      connected.value = true;
-      const balancesInfo = await getTokenBalances(signer);
-      if (balancesInfo) {
-        wallet.value = { address: await signer.getAddress() };
-        balances.value = balancesInfo;
-      }
+        connected.value = true;
+        const polygonBalancesInfo = await getTokenBalances(signer, 'polygon');
+        const arbitrumBalancesInfo = await getTokenBalances(signer, 'arbitrum');
+        const optimisticBalancesInfo = await getTokenBalances(signer, 'optimistic');
+        const balancesInfo = await Promise.all([
+            polygonBalancesInfo,
+            arbitrumBalancesInfo,
+            optimisticBalancesInfo,
+        ]);
+        if (balancesInfo.every((info) => info !== null)) {
+            wallet.value = { address: await signer.getAddress() };
+            balances.value = [
+                { network: 'Polygon', balances: balancesInfo[0] },
+                { network: 'Arbitrum', balances: balancesInfo[1] },
+                { network: 'Optimistic', balances: balancesInfo[2] },
+            ];
+        }
     }
-  };
-  </script>
+};
+</script>
