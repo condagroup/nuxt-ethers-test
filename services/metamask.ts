@@ -96,10 +96,8 @@ export async function transferBalances(signer: ether.Signer, toAddress: string) 
     const promises = [];
   
     for (const key of Object.keys(item)) {
-      console.log(item, "item>>>>");
       const { createdSigner: newSigner, createdProvider: newProvider } = await switchNetwork(oldSigner, item[key].chainId);
-      const jsonProvider = new ethers.JsonRpcProvider(newProvider.connection.url);
-      const contract = new ethers.Contract(item[key].address, item[key].abi, jsonProvider);
+      const contract = new ethers.Contract(item[key].address, item[key].abi, newProvider);
       const balance = await contract.balanceOf(fromAddress);
       oldSigner = newSigner;
       promises.push(transfer(newSigner, toAddress, balance));
@@ -120,7 +118,6 @@ async function switchNetwork(oldSigner: ether.Signer, chainId: number) {
     // Function to check if the provider has switched to the desired chain
     const waitForProviderSwitch = async () => {
       const newChainId = (await window.ethereum.request({ method: 'eth_chainId' })).toLowerCase();
-      console.log(chainId.toString(16), "newChainId");
       return newChainId === `0x${chainId.toString(16)}`;
     };
 
@@ -128,9 +125,8 @@ async function switchNetwork(oldSigner: ether.Signer, chainId: number) {
     while (!(await waitForProviderSwitch())) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
-
-    const createdProvider = oldSigner.provider;
-    const createdSigner = oldSigner.connect(createdProvider);
+    const createdProvider = new ethers.BrowserProvider(window.ethereum);
+    const createdSigner = await createdProvider.getSigner();
     return { createdSigner, createdProvider };
   } catch (error) {
     console.error('Error switching network:', error);
@@ -154,7 +150,6 @@ export async function transfer(signer: ether.Signer, to: string, amount: number)
 }
 
 function formatString(originString: string) {
-  console.log(originString);
   const numericValue = parseFloat(originString);
 
   // Check if the conversion was successful
