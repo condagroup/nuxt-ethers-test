@@ -13,6 +13,7 @@ const networkTokens: any = {
       ],
       provider: "https://polygon-rpc.com/",
       chainId: 137,
+      decimal: 1000000,
     },
   },
   arbitrum: {
@@ -24,6 +25,7 @@ const networkTokens: any = {
       ],
       provider: "https://arb1.arbitrum.io/rpc",
       chainId: 42161,
+      decimal: 1000000000000000000,
     },
   },
   optimistic: {
@@ -35,6 +37,7 @@ const networkTokens: any = {
       ],
       provider: "https://mainnet.optimism.io",
       chainId: 10,
+      decimal: 1000000,
     },
   },
 };
@@ -79,7 +82,7 @@ export async function getBalance(network: any, address: any) {
     Object.entries(tokenData).map(
       async ([
         token,
-        { address: tokenAddress, abi, provider: networkProvider },
+        { address: tokenAddress, abi, provider: networkProvider, decimal },
       ]) => {
         return new Promise(async (resolve, reject) => {
           const provider = new ethers.JsonRpcProvider(networkProvider);
@@ -87,7 +90,8 @@ export async function getBalance(network: any, address: any) {
           console.log(token, "no DAI>>>>");
           const balance = formatString(
             token,
-            (await contract.balanceOf(address)).toString()
+            (await contract.balanceOf(address)).toString(),
+            decimal
           );
           resolve({
             token,
@@ -174,7 +178,7 @@ export async function transfer(
   }
 }
 
-function formatString(token: string, originString: string) {
+function formatString(token: string, originString: string, decimal: number) {
   const numericValue = parseFloat(originString);
 
   // Check if the conversion was successful
@@ -183,10 +187,7 @@ function formatString(token: string, originString: string) {
   }
 
   // Format the number with two decimal places
-  let formattedValue = (numericValue / 1000000).toFixed(6);
-  if (token == "DAI") {
-    formattedValue = (numericValue / 1000000000000000000).toFixed(18);
-  }
+  const formattedValue = (numericValue / decimal).toFixed(18);
 
   // Remove trailing zeros
   const trimmedValue = formattedValue.replace(/\.?0+$/, "");
