@@ -48,25 +48,15 @@ export async function connectWallet() {
       await window.ethereum.request({ method: "eth_requestAccounts" });
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
+      const eoaWalletAddr = await signer.getAddress();
       const avocadoWalletAddr = await avocado(signer.address);
-      return { signer, avocadoWalletAddr };
+      return { signer, eoaWalletAddr, avocadoWalletAddr };
     } catch (error) {
       console.error("Error connecting to Metamask:", error);
       return null;
     }
   } else {
     console.error("Metamask not found");
-    return null;
-  }
-}
-
-export async function getTokenBalances(signer: ether.Signer, network: string) {
-  try {
-    const address = await signer.getAddress();
-    const balances = getBalance(network, address);
-    return balances;
-  } catch (error) {
-    console.error("Error getting token balances:", error);
     return null;
   }
 }
@@ -87,9 +77,7 @@ export async function getBalance(network: any, address: any) {
         return new Promise(async (resolve, reject) => {
           const provider = new ethers.JsonRpcProvider(networkProvider);
           const contract = new ethers.Contract(tokenAddress, abi, provider);
-          console.log(token, "no DAI>>>>");
           const balance = formatString(
-            token,
             (await contract.balanceOf(address)).toString(),
             decimal
           );
@@ -178,7 +166,7 @@ export async function transfer(
   }
 }
 
-function formatString(token: string, originString: string, decimal: number) {
+function formatString(originString: string, decimal: number) {
   const numericValue = parseFloat(originString);
 
   // Check if the conversion was successful
